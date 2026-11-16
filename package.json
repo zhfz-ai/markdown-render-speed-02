@@ -1,1 +1,1 @@
-{"description":"Fast single-pass CommonMark + GFM renderer matching marked 18.1.3","license":"MIT","main":"parse.js","name":"swiftmark","type":"module","version":"3.0.0"}
+{"description":"A fast drop-in replacement for marked 18.1.3 — renders exactly marked's HTML (CommonMark 0.31.2 + GFM 0.29) for less CPU.","engines":{"node":">=22"},"exports":{".":"./parse.js"},"keywords":["markdown","commonmark","gfm","marked","renderer"],"license":"MIT","main":"parse.js","name":"swiftmark","type":"module","version":"1.0.0"}
