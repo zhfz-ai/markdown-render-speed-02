@@ -1,11 +1,11 @@
 // SwiftMark — a dependency-free, single-pass Markdown renderer that returns
 // byte-identical HTML to marked 18.1.3 with its default options (GFM on,
-// breaks off, pedantic off, async off). Hand-written in this session from the
-// kit's RULES.txt and the marked 18.1.3 behaviour it documents: a block
-// scanner that walks the source once into light tokens, then a renderer that
-// turns inline spans straight into HTML (no token tree on the hot path).
+// breaks off, pedantic off, async off). Written fresh in this session from
+// the kit's RULES.txt and marked 18.1.3's documented behaviour: a block
+// scanner walks the source once into light tokens, then a renderer turns
+// inline spans straight into HTML (no token tree on the hot path).
 //
-// Design notes (all my own structure):
+// Design notes (my own structure):
 // - parse() is stateless per call: nothing is kept from an earlier case.
 // - Link reference definitions are collected during the block scan, before
 //   any inline rendering, so a definition anywhere in the document applies.
