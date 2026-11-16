@@ -1210,7 +1210,9 @@ function extractRefDefs(text, refs) {
 // Expand leading tabs to spaces for the column they start at (a tab at
 // column 13 reaches column 16, i.e. 3 spaces). Only when the content
 // starts inside a container indent (col > 0); a tab at the top level
-// (col 0) stays a raw tab in code content.
+// (col 0) stays a raw tab in code content. Blockquote markers `>` have
+// width 0 for tab stops, so the caller passes the column with the number
+// of matched quote markers already subtracted.
 function expandLeadTabs(text, col) {
   if (col === 0) return text;
   let i = 0, c = col, out = "";
@@ -1219,6 +1221,13 @@ function expandLeadTabs(text, col) {
     out += " ".repeat(w); c += w; i++;
   }
   return out + text.slice(i);
+}
+// Number of blockquote markers matched by the container walk (stack
+// entries 1..depth-1 that are quotes). Used to correct tab-stop columns.
+function matchedQuotes(stk, depth) {
+  let n = 0;
+  for (let s = 1; s < depth; s++) if (stk[s] && stk[s].type === "quote") n++;
+  return n;
 }
 
 function stripCols(rest, pos, col, n) {
@@ -1490,6 +1499,14 @@ function parseBlocks(src, refs) {
     const line = lines[li];
     if (line.trim() === "") {
       const top = stack[stack.length - 1];
+      // A whitespace-only (but non-empty) line inside a table is an empty
+      // table row, not a blank line ending the table (the row is padded
+      // to the header's cell count when rendered).
+      if (top.type === "table" && line.length > 0) {
+        top.rows.push(splitTableRow(line));
+        lastLineBlank = false;
+        continue;
+      }
       if (top.type === "para") { finalizeNode(top); stack.pop(); }
       else if (top.type === "table") { stack.pop(); }
       else if (top.type === "code" || top.type === "fence" || top.type === "html") {
@@ -1581,10 +1598,10 @@ function parseBlocks(src, refs) {
         else top.lines.push(rest);
       } else if (top.type === "code") {
         const sc = stripCols(rest, 0, startCol, 4);
-        top.lines.push(expandLeadTabs(sc.text, sc.col));
+        top.lines.push(expandLeadTabs(sc.text, sc.col - matchedQuotes(stack, depth)));
       } else if (top.type === "fence") {
         const sc = stripCols(rest, 0, startCol, top.indent);
-        top.lines.push(expandLeadTabs(sc.text, sc.col));
+        top.lines.push(expandLeadTabs(sc.text, sc.col - matchedQuotes(stack, depth)));
       } else if (top.type === "html") {
         if (top.htype === 6 || top.htype === 7) stack.pop();
         else top.lines.push(rest);
@@ -1663,7 +1680,7 @@ function parseBlocks(src, refs) {
       if (depth === stack.length - 1) {
         if (matchFenceClose(rest, top)) { stack.pop(); lastLineBlank = false; continue; }
         const sc = stripCols(rest, 0, startCol, top.indent);
-        top.lines.push(expandLeadTabs(sc.text, sc.col));
+        top.lines.push(expandLeadTabs(sc.text, sc.col - matchedQuotes(stack, depth)));
         lastLineBlank = false;
         continue;
       }
@@ -1681,7 +1698,7 @@ function parseBlocks(src, refs) {
       if (quoteFailed || matchBlockStart(rest, startCol, false, lines, li)) { stack.pop(); }
       else {
         const sc = stripCols(rest, 0, startCol, top.indent);
-        top.lines.push(expandLeadTabs(sc.text, sc.col));
+        top.lines.push(expandLeadTabs(sc.text, sc.col - matchedQuotes(stack, depth)));
         lastLineBlank = false;
         continue;
       }
@@ -1759,16 +1776,21 @@ function renderNode(node, refs, out) {
     case "heading":
       out.push("<h" + node.level + ">" + inlineParse(node.text, refs) + "</h" + node.level + ">\n");
       break;
-    case "code":
-      out.push("<pre><code>" + escapeHtml(node.lines.join("\n")) + (node.lines.length > 0 ? "\n" : "") + "</code></pre>\n");
+    case "code": {
+      const ls = node.lines.slice();
+      while (ls.length && ls[ls.length - 1] === "") ls.pop();
+      out.push("<pre><code>" + escapeHtml(ls.join("\n")) + (ls.length > 0 ? "\n" : "") + "</code></pre>\n");
       break;
+    }
     case "fence": {
       let cls = "";
       if (node.info) {
         const w = node.info.split(/[ \t]/)[0];
         if (w) cls = ' class="language-' + escapeHtml(unescapeStr(w), true) + '"';
       }
-      out.push("<pre><code" + cls + ">" + escapeHtml(node.lines.join("\n")) + (node.lines.length > 0 ? "\n" : "") + "</code></pre>\n");
+      const ls = node.lines.slice();
+      while (ls.length && ls[ls.length - 1] === "") ls.pop();
+      out.push("<pre><code" + cls + ">" + escapeHtml(ls.join("\n")) + (ls.length > 0 ? "\n" : "") + "</code></pre>\n");
       break;
     }
     case "html":
