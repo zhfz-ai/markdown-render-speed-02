@@ -1667,7 +1667,24 @@ function parseBlocks(src, refs) {
         lastLineBlank = false;
         continue;
       }
-      stack.pop();
+      // A lazy line only ends a fence when the container it fails to match
+      // is a block quote (the quote closes, taking the fence with it). A
+      // list item stays open across a lazy line, so a fence inside an item
+      // keeps a plain-text lazy line as content (e.g. `fn main()...` at
+      // column 0 inside a 2-space-indented fence in a list item). But a
+      // lazy line that starts a new block (list item, heading, fence)
+      // ends the fence instead.
+      let quoteFailed = false;
+      for (let s = depth; s < stack.length - 1; s++) {
+        if (stack[s].type === "quote") { quoteFailed = true; break; }
+      }
+      if (quoteFailed || matchBlockStart(rest, startCol, false, lines, li)) { stack.pop(); }
+      else {
+        const sc = stripCols(rest, 0, startCol, top.indent);
+        top.lines.push(expandLeadTabs(sc.text, sc.col));
+        lastLineBlank = false;
+        continue;
+      }
     } else if (top.type === "html") {
       if (depth === stack.length - 1) {
         top.lines.push(rest);
@@ -1678,7 +1695,23 @@ function parseBlocks(src, refs) {
         lastLineBlank = false;
         continue;
       }
-      stack.pop();
+      // Same lazy-line rule as fences: only a failed block quote ends an
+      // HTML block; a list item stays open, so a plain-text lazy line is
+      // HTML content. A lazy line that starts a new block ends the HTML.
+      let quoteFailed = false;
+      for (let s = depth; s < stack.length - 1; s++) {
+        if (stack[s].type === "quote") { quoteFailed = true; break; }
+      }
+      if (quoteFailed || matchBlockStart(rest, startCol, false, lines, li)) { stack.pop(); }
+      else {
+        top.lines.push(rest);
+        if (htmlEnds(top, rest)) {
+          if (li + 1 < lines.length && lines[li + 1].trim() === "") top.trailNL = false;
+          stack.pop();
+        }
+        lastLineBlank = false;
+        continue;
+      }
     } else if (top.type === "table") {
       if (depth === stack.length - 1) {
         const bs = matchBlockStart(rest, startCol, false, lines, li);
