@@ -1,8 +1,9 @@
-// Driver for the markdown-render-speed-02 entry: read every case, render
-// each one alone with parse() from parse.js, and write the HTML array out.
-// Input and output directories come from the environment when set, and fall
-// back to the harness paths /input and /output otherwise.
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+// SwiftMark driver: renders every case in /input/cases.json with parse() from
+// parse.js and writes the HTML array to /output/html.json, in order.
+// Run as `node main.ts` (Node 22 strips types natively). Outside a container
+// MAKEFUN_INPUT_DIR / MAKEFUN_OUTPUT_DIR stand in for /input and /output.
+// Each case is rendered alone: parse() keeps nothing from an earlier call.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from './parse.js';
 
