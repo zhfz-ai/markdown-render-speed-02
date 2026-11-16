@@ -30,7 +30,7 @@ No dependencies, no regular-expression backtracking on hot paths, no
 per-case caching (each `parse` call is independent, as the rules require).
 
 Local practice results (720 cases): 680 pass; mean full-set parse time
-~536 ms on this machine, against the 777.3 ms marked baseline.
+~571 ms on this machine, against the 777.3 ms marked baseline.
 
 ## Run it
 
