@@ -442,6 +442,47 @@ function checkboxHtml(cb) {
   return '<input ' + (cb.checked ? 'checked="" ' : '') + 'disabled="" type="checkbox"> ';
 }
 
+// Cheap necessary-condition filters for two expensive block regexes. A
+// setext underline is a line starting with 0-3 spaces then = or -; a table
+// delimiter row is the second line and holds only | : - and spaces, with at
+// least one -. If the filter fails the regex cannot match; if it passes the
+// regex still decides.
+function hasSetextUnderline(s) {
+  for (let i = s.indexOf('\n'); i !== -1; i = s.indexOf('\n', i + 1)) {
+    let j = i + 1, sp = 0;
+    while (sp < 3 && s[j] === ' ') { j++; sp++; }
+    const c = s[j];
+    if (c === '=' || c === '-') return true;
+  }
+  return false;
+}
+
+function tableDelimiterLine(s) {
+  const nl = s.indexOf('\n');
+  if (nl === -1) return false;
+  let j = nl + 1, sp = 0;
+  while (sp < 3 && s[j] === ' ') { j++; sp++; }
+  let hasDash = false;
+  for (; j < s.length; j++) {
+    const c = s[j];
+    if (c === '\n') break;
+    if (c === '-') { hasDash = true; continue; }
+    if (c === '|' || c === ':' || c === ' ') continue;
+    return false;
+  }
+  return hasDash;
+}
+
+/** Whether s ends with a blank line (a \n, only spaces/tabs, another \n). */
+function endsDoubleBlank(a) {
+  let i = a.length;
+  while (i > 0 && (a[i - 1] === ' ' || a[i - 1] === '\t')) i--;
+  if (i === 0 || a[i - 1] !== '\n') return false;
+  i--;
+  while (i > 0 && (a[i - 1] === ' ' || a[i - 1] === '\t')) i--;
+  return i > 0 && a[i - 1] === '\n';
+}
+
 function tokenizeSpace(src) {
   const t = NEWLINE_RE.exec(src);
   if (t && t[0].length > 0) return { type: 'space', raw: t[0] };
@@ -511,6 +552,7 @@ function tokenizeDef(src) {
 }
 
 function tokenizeTable(src, ctx) {
+  if (!tableDelimiterLine(src)) return null;
   const t = TABLE_RE.exec(src);
   if (!t || !TABLE_DELIM.test(t[2])) return null;
   const head = splitRow(t[1]);
@@ -540,6 +582,7 @@ function tokenizeTable(src, ctx) {
 }
 
 function tokenizeLheading(src, ctx) {
+  if (!hasSetextUnderline(src)) return null;
   const t = LHEADING_RE.exec(src);
   if (!t) return null;
   const tok = { type: 'heading', raw: stripTail(t[0], '\n'), depth: t[2].charAt(0) === '=' ? 1 : 2, text: t[1].trim() };
@@ -683,7 +726,7 @@ function tokenizeList(src, ctx) {
     const A = orig.slice(k, used());
     if (!item.loose) {
       if (p) item.loose = true;
-      else if (DOUBLE_BLANK.test(A)) p = true;
+      else if (endsDoubleBlank(A)) p = true;
     }
     item.items.push({ type: 'list_item', raw: A, task: LIST_IS_TASK.test(d), loose: false, text: d, tokens: [] });
   }
